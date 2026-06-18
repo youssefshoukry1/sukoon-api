@@ -4,6 +4,9 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -57,9 +60,14 @@ const createOrder = async (req, res) => {
           <p><strong>Date:</strong> ${new Date().toLocaleString('ar-EG')}</p>
         `
       };
-      await transporter.sendMail(mailOptions);
-    } catch (mailError) {
-      console.error("Failed to send email notification:", mailError);
+      
+      // Do NOT await so the order creation returns instantly to the user
+      transporter.sendMail(mailOptions).catch(mailError => {
+        console.error("Failed to send email notification asynchronously:", mailError);
+      });
+      
+    } catch (mailOptionsError) {
+      console.error("Error setting up mail options:", mailOptionsError);
     }
 
     res.status(201).json({ success: true, message: "Order created successfully", data: order });
