@@ -1,74 +1,30 @@
 const Order = require('../models/model-order');
 const Product = require('../models/model-product');
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
 
 // Create a new order
 const createOrder = async (req, res) => {
   try {
-    const { customerName, phoneNumber, location, quantity, paymentMethod } = req.body;
+    const { customerName, phoneNumber, location, quantity, paymentMethod, totalPrice } = req.body;
     
     // Basic validation
     if (!customerName || !phoneNumber || !location) {
       return res.status(400).json({ success: false, message: "Name, phone, and location are required." });
     }
 
-    // Assuming we fetch the single active product to get the price
-    const product = await Product.findOne({ isActive: true });
-    if (!product) {
-      return res.status(404).json({ success: false, message: "Product not available for order." });
-    }
-
     const orderQuantity = quantity || 1;
-    const totalPrice = product.price * orderQuantity;
+    // Use totalPrice from frontend (already includes shipping cost)
+    const finalPrice = totalPrice || 0;
 
     const order = new Order({
       customerName,
       phoneNumber,
       location,
       quantity: orderQuantity,
-      totalPrice,
+      totalPrice: finalPrice,
       paymentMethod
     });
 
     await order.save();
-
-    // Send email notification
-    try {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER, // Send to the same email to notify the admin
-        subject: `New Order Received - Sukoon`,
-        html: `
-          <h2>New Order Received</h2>
-          <p><strong>Customer Name:</strong> ${customerName}</p>
-          <p><strong>Phone Number:</strong> ${phoneNumber}</p>
-          <p><strong>Location:</strong> ${location}</p>
-          <p><strong>Quantity:</strong> ${orderQuantity}</p>
-          <p><strong>Total Price:</strong> ${totalPrice} ج</p>
-          <p><strong>Payment Method:</strong> ${paymentMethod || 'Cash on Delivery'}</p>
-          <p><strong>Date:</strong> ${new Date().toLocaleString('ar-EG')}</p>
-        `
-      };
-      
-      // Do NOT await so the order creation returns instantly to the user
-      transporter.sendMail(mailOptions).catch(mailError => {
-        console.error("Failed to send email notification asynchronously:", mailError);
-      });
-      
-    } catch (mailOptionsError) {
-      console.error("Error setting up mail options:", mailOptionsError);
-    }
 
     res.status(201).json({ success: true, message: "Order created successfully", data: order });
   } catch (error) {
